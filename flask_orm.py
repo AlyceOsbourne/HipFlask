@@ -15,7 +15,7 @@ def _get_attributes(attributes):
 class Pipe(type):
     def __rshift__(cls, other):
         instance = cls()
-        return instance.__or__(other)
+        return instance.__rshift__(other)
 
 
 class Base(metaclass = Pipe):
@@ -147,3 +147,4 @@ class JinjaExtends(Tag):
                 content = self.content + _assign_children(self.children),
                 wrapper_end = self.wrapper_end.replace("{block_name}", self.tag),
         )
+
