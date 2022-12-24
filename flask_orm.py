@@ -86,15 +86,13 @@ class HTMLTag(Tag):
         )
 
     def __str__(self):
-        start = self.wrapper_start.format(
-                tag = self.tag,
-                attributes = _get_attributes(self.attributes)
-        )
-        end = self.wrapper_end.format(tag = self.tag)
         return self.html.format(
-                wrapper_start = start,
+                wrapper_start = self.wrapper_start.format(
+                        tag = self.tag,
+                        attributes = _get_attributes(self.attributes)
+                ),
                 content = self.content + _assign_children(self.children),
-                wrapper_end = end if self.uses_end_tag else ""
+                wrapper_end = self.wrapper_end.format(tag = self.tag) if self.uses_end_tag else ""
         )
 
 
@@ -149,4 +147,3 @@ class JinjaExtends(Tag):
                 content = self.content + _assign_children(self.children),
                 wrapper_end = self.wrapper_end.replace("{block_name}", self.tag),
         )
-
