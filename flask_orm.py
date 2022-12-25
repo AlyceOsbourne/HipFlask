@@ -32,11 +32,14 @@ class Base:
         if isinstance(other, Base):
             self.children.append(other)
         elif isinstance(other, (list, tuple)):
-            self.children.extend(other)
+            for thing in other:
+                self.__rshift__(thing)
         elif isinstance(other, str):
             self.content += other
         elif isinstance(other, dict):
             self.attributes.update(other)
+        elif other is None:
+            pass
         else:
             raise TypeError("Cannot add {} to HTML object".format(type(other)))
         return self
@@ -136,64 +139,3 @@ class JinjaExtends(Tag):
         )
 
 
-class Page:
-    """Base class for HTML pages"""
-    root = HTMLTag("!DOCTYPE html", uses_end_tag = False)
-    head = HTMLTag("head")
-    body = HTMLTag("body")
-
-    root >> head >> body
-
-    def __str__(self):
-        return str(self.root)
-
-    def __init__(
-            self,
-            **kwargs
-    ):
-        if kwargs:
-            if "title" in kwargs:
-                self.head = HTMLTag("title") >> kwargs["title"]
-                kwargs.pop("title")
-            if "meta" in kwargs:
-                self.meta = HTMLTag("meta", **kwargs["meta"])
-                kwargs.pop("meta")
-            if "body" in kwargs:
-                self.body = kwargs["body"]
-                kwargs.pop("body")
-            if "head" in kwargs:
-                self.head = kwargs["head"]
-                kwargs.pop("head")
-            if "root" in kwargs:
-                self.root = kwargs["root"]
-                kwargs.pop("root")
-
-
-def create_page(**kwargs):
-    return Page(**kwargs)
-
-
-if __name__ == "__main__":
-    head = lambda: [
-            HTMLTag("link", rel = "stylesheet", href = "style.css"),
-            HTMLTag("script", src = "script.js")
-    ]
-
-    nav_bar = lambda *links: (HTMLTag("nav") >>
-                              HTMLTag("ul") >>
-                              [HTMLTag("li", href = link[1]) >> link[0]
-                               for link in links])
-    body = lambda: [
-            JinjaBlock("nav_bar") >> nav_bar(("Home", "#"), ("About", "#"), ("Contact", "#")),
-            JinjaBlock("body") >> "Hello World!",
-            JinjaBlock("footer") >> (HTMLTag("footer") >> "© 2022")
-    ]
-
-    page = create_page(
-            title = JinjaBlock("title") >> "Hello World",
-            meta = {"charset": "utf-8"},
-            head = head(),
-            body = body()
-    )
-    soup = bs4.BeautifulSoup(str(page), "html.parser")
-    print(soup.prettify())
