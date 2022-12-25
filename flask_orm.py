@@ -1,3 +1,6 @@
+import bs4
+
+
 def _assign_children(children):
     children_html = ""
     for child in children:
@@ -12,13 +15,7 @@ def _get_attributes(attributes):
     return attrs
 
 
-class Pipe(type):
-    def __rshift__(cls, other):
-        instance = cls()
-        return instance.__rshift__(other)
-
-
-class Base(metaclass = Pipe):
+class Base:
     """Base class for HTML objects, this includes tags, text, comments, jinja, etc."""
 
     def __init__(self, wrapper_start, wrapper_end, uses_end_tag = True, **attributes):
@@ -148,3 +145,62 @@ class JinjaExtends(Tag):
                 wrapper_end = self.wrapper_end.replace("{block_name}", self.tag),
         )
 
+
+class Page:
+    """Base class for HTML pages"""
+    root = HTMLTag("!DOCTYPE html", uses_end_tag = False)
+    head = HTMLTag("head")
+    body = HTMLTag("body")
+
+    root >> head >> body
+
+    def __str__(self):
+        return str(self.root)
+
+    def __init__(
+            self,
+            **kwargs
+    ):
+        if kwargs:
+            if "title" in kwargs:
+                self.head = HTMLTag("title") >> kwargs["title"]
+                kwargs.pop("title")
+            if "meta" in kwargs:
+                self.meta = HTMLTag("meta", **kwargs["meta"])
+                kwargs.pop("meta")
+            if "body" in kwargs:
+                self.body = kwargs["body"]
+                kwargs.pop("body")
+            if "head" in kwargs:
+                self.head = kwargs["head"]
+                kwargs.pop("head")
+            if "root" in kwargs:
+                self.root = kwargs["root"]
+                kwargs.pop("root")
+
+
+def create_page(**kwargs):
+    return Page(**kwargs)
+
+
+if __name__ == "__main__":
+    nav_bar = lambda *links: (HTMLTag("nav") >>
+                              HTMLTag("ul") >>
+                              [HTMLTag("li", href = link[1]) >> link[0]
+                               for link in links])
+
+    page = create_page(
+            title = JinjaBlock("title") >> "Hello World",
+            meta = {"charset": "utf-8"},
+            head = [
+                    HTMLTag("link", rel = "stylesheet", href = "style.css"),
+                    HTMLTag("script", src = "script.js")
+            ],
+            body = [
+                    JinjaBlock("nav_bar") >> nav_bar(("Home", "#"), ("About", "#"), ("Contact", "#")),
+                    JinjaBlock("body") >> "Hello World!",
+                    JinjaBlock("footer") >> HTMLTag("footer") >> "© 2022"
+            ]
+    )
+    soup = bs4.BeautifulSoup(str(page), "html.parser")
+    print(soup.prettify())
