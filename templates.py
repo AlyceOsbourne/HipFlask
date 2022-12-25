@@ -1,8 +1,10 @@
-from tags import *
 from bs4 import BeautifulSoup
 
+from flask_orm import JinjaBlock, JinjaComment
+from tags import *
 
-def nav_bar(*links):
+
+def nav_bar(*links, dark = False):
     nav = Nav()
     ul = Ul()
     for link in links:
@@ -78,15 +80,28 @@ class Page:
         return str(self.root)
 
 
+
+
 if __name__ == "__main__":
     page = Page(
             title = JinjaBlock("title") >> "Hello World",
-            head = [bootstrap(), JinjaBlock("head")],
+            head = [
+                    JinjaComment("Loading Bootstrap"),
+                    bootstrap(),
+                    JinjaBlock("head"),
+                    JinjaBlock("css"),
+                    JinjaBlock("js"),
+            ],
             body = [
                     nav_bar(("Home", "/"), ("About", "/about"), ("Contact", "/contact")),
                     JinjaBlock("content"),
                     Footer() >> "© 2022",
             ],
     )
+
     soup = BeautifulSoup(str(page), "html.parser")
-    print(soup.prettify())
+    pretty = soup.prettify()
+    print(pretty)
+
+    with open("index.html", "w") as f:
+        f.write(pretty)

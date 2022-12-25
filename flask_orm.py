@@ -1,4 +1,4 @@
-import bs4
+from functools import partial
 
 
 def _assign_children(children):
@@ -18,7 +18,9 @@ def _get_attributes(attributes):
 class Base:
     """Base class for HTML objects, this includes tags, text, comments, jinja, etc."""
 
-    def __init__(self, wrapper_start, wrapper_end, tag, uses_end_tag = True, **attributes):
+    def __init__(
+            self, wrapper_start, wrapper_end, tag, uses_end_tag = True, **attributes
+    ):
         self.children = []
         self.wrapper_start = wrapper_start
         self.wrapper_end = wrapper_end
@@ -78,11 +80,12 @@ class HTMLTag(Tag):
     def __str__(self):
         return self.html.format(
                 wrapper_start = self.wrapper_start.format(
-                        tag = self.tag,
-                        attributes = _get_attributes(self.attributes)
+                        tag = self.tag, attributes = _get_attributes(self.attributes)
                 ),
                 content = self.content + _assign_children(self.children),
-                wrapper_end = self.wrapper_end.format(tag = self.tag) if self.uses_end_tag else ""
+                wrapper_end = self.wrapper_end.format(tag = self.tag)
+                if self.uses_end_tag
+                else "",
         )
 
 
@@ -139,3 +142,75 @@ class JinjaExtends(Tag):
         )
 
 
+class JinjaComment(Tag):
+    def __init__(self, tag, **kwargs):
+        super().__init__(
+                wrapper_start = "{# {block_name} #}",
+                wrapper_end = "",
+                tag = tag,
+                uses_end_tag = False,
+                **kwargs
+        )
+
+    def __str__(self):
+        return self.html.format(
+                wrapper_start = self.wrapper_start.replace("{block_name}", self.tag),
+                content = self.content + _assign_children(self.children),
+                wrapper_end = self.wrapper_end.replace("{block_name}", self.tag),
+        )
+
+
+class JinjaExpression(Tag):
+    def __init__(self, tag, **kwargs):
+        super().__init__(
+                wrapper_start = "{{ {block_name} }}",
+                wrapper_end = "",
+                tag = tag,
+                uses_end_tag = False,
+                **kwargs
+        )
+
+    def __str__(self):
+        return self.html.format(
+                wrapper_start = self.wrapper_start.replace("{block_name}", self.tag),
+                content = self.content + _assign_children(self.children),
+                wrapper_end = self.wrapper_end.replace("{block_name}", self.tag),
+        )
+
+
+class JinjaStatement(Tag):
+    def __init__(self, tag, **kwargs):
+        super().__init__(
+                wrapper_start = "{% {block_name} %}",
+                wrapper_end = "",
+                tag = tag,
+                uses_end_tag = False,
+                **kwargs
+        )
+
+    def __str__(self):
+        return self.html.format(
+                wrapper_start = self.wrapper_start.replace("{block_name}", self.tag),
+                content = self.content + _assign_children(self.children),
+                wrapper_end = self.wrapper_end.replace("{block_name}", self.tag),
+        )
+
+
+def _make(tag, cls, **kwargs):
+    return type(
+            tag,
+            (cls,),
+            {
+                    "__init__": lambda self, **_kwargs: cls.__init__(
+                            self, tag, **kwargs, **_kwargs
+                    )
+            },
+    )
+
+
+make_tag_class = partial(_make, cls = HTMLTag)
+make_jinja_block_class = partial(_make, cls = JinjaBlock)
+make_jinja_include_class = partial(_make, cls = JinjaInclude)
+make_jinja_extends_class = partial(_make, cls = JinjaExtends)
+make_jinja_comment_class = partial(_make, cls = JinjaComment)
+make_jinja_expression_class = partial(_make, cls = JinjaExpression)
