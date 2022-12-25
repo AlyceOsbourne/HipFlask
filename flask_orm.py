@@ -184,23 +184,26 @@ def create_page(**kwargs):
 
 
 if __name__ == "__main__":
+    head = lambda: [
+            HTMLTag("link", rel = "stylesheet", href = "style.css"),
+            HTMLTag("script", src = "script.js")
+    ]
+
     nav_bar = lambda *links: (HTMLTag("nav") >>
                               HTMLTag("ul") >>
                               [HTMLTag("li", href = link[1]) >> link[0]
                                for link in links])
+    body = lambda: [
+            JinjaBlock("nav_bar") >> nav_bar(("Home", "#"), ("About", "#"), ("Contact", "#")),
+            JinjaBlock("body") >> "Hello World!",
+            JinjaBlock("footer") >> (HTMLTag("footer") >> "© 2022")
+    ]
 
     page = create_page(
             title = JinjaBlock("title") >> "Hello World",
             meta = {"charset": "utf-8"},
-            head = [
-                    HTMLTag("link", rel = "stylesheet", href = "style.css"),
-                    HTMLTag("script", src = "script.js")
-            ],
-            body = [
-                    JinjaBlock("nav_bar") >> nav_bar(("Home", "#"), ("About", "#"), ("Contact", "#")),
-                    JinjaBlock("body") >> "Hello World!",
-                    JinjaBlock("footer") >> HTMLTag("footer") >> "© 2022"
-            ]
+            head = head(),
+            body = body()
     )
     soup = bs4.BeautifulSoup(str(page), "html.parser")
     print(soup.prettify())
