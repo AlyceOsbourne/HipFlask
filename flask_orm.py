@@ -18,7 +18,7 @@ def _get_attributes(attributes):
 class Base:
     """Base class for HTML objects, this includes tags, text, comments, jinja, etc."""
 
-    def __init__(self, wrapper_start, wrapper_end, uses_end_tag = True, **attributes):
+    def __init__(self, wrapper_start, wrapper_end, tag, uses_end_tag = True, **attributes):
         self.children = []
         self.wrapper_start = wrapper_start
         self.wrapper_end = wrapper_end
@@ -26,11 +26,7 @@ class Base:
         self.uses_end_tag = uses_end_tag
         self.attributes = attributes
         self.content = ""
-
-    def __iter__(self):
-        for child in self.children:
-            with child as child_html:
-                yield child_html
+        self.tag = tag
 
     def __rshift__(self, other):
         if isinstance(other, Base):
@@ -39,21 +35,15 @@ class Base:
             self.children.extend(other)
         elif isinstance(other, str):
             self.content += other
+        elif isinstance(other, dict):
+            self.attributes.update(other)
+        else:
+            raise TypeError("Cannot add {} to HTML object".format(type(other)))
         return self
 
 
 class Tag(Base):
-    """Base class for HTML tags"""
-
-    def __init__(self, tag, **kwargs):
-        super().__init__(**kwargs)
-        self.tag = tag
-
-    def __rshift__(self, other):
-        if isinstance(other, dict):
-            self.attributes.update(other)
-            return self
-        return super().__rshift__(other)
+    """Descriptor Wrapper for the Base class"""
 
     def __set__(self, instance, value):
         if instance is None:
