@@ -8,6 +8,7 @@ Body = make_tag_class("body")
 # common head tags
 Title = make_tag_class("title")
 Meta = make_tag_class("meta")
+Style = make_tag_class("style")
 StyleSheet = make_tag_class("link", rel = "stylesheet")
 Script = make_tag_class("script")
 

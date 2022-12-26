@@ -40,10 +40,10 @@ class Base:
             self.content += other
         elif isinstance(other, dict):
             self.attributes.update(other)
-        elif other is None:
-            pass
+        elif hasattr(other, 'render'):
+            self.content += " " + other.render()
         else:
-            raise TypeError("Cannot add {} to HTML object".format(type(other)))
+            pass
         return self
 
 
