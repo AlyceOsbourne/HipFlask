@@ -1,3 +1,4 @@
+from copy import copy, deepcopy
 from functools import partial
 
 
@@ -51,10 +52,7 @@ class Tag(Base):
     """Descriptor Wrapper for the Base class"""
 
     def __set__(self, instance, value):
-        if instance is None:
-            return self
-        else:
-            self.__rshift__(value)
+        self.__rshift__(value)
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -66,6 +64,13 @@ class Tag(Base):
         self.attributes = {}
         self.children = []
         self.content = ""
+
+    def __str__(self):
+        return self.html.format(
+                wrapper_start = self.wrapper_start.replace("{block_name}", self.tag),
+                content = self.content + _assign_children(self.children),
+                wrapper_end = self.wrapper_end.replace("{block_name}", self.tag),
+        )
 
 
 class HTMLTag(Tag):
@@ -98,13 +103,6 @@ class JinjaBlock(Tag):
                 **kwargs
         )
 
-    def __str__(self):
-        return self.html.format(
-                wrapper_start = self.wrapper_start.replace("{block_name}", self.tag),
-                content = self.content + _assign_children(self.children),
-                wrapper_end = self.wrapper_end.replace("{block_name}", self.tag),
-        )
-
 
 class JinjaInclude(Tag):
     def __init__(self, tag, **kwargs):
@@ -114,13 +112,6 @@ class JinjaInclude(Tag):
                 tag = tag,
                 uses_end_tag = False,
                 **kwargs
-        )
-
-    def __str__(self):
-        return self.html.format(
-                wrapper_start = self.wrapper_start.replace("{block_name}", self.tag),
-                content = self.content + _assign_children(self.children),
-                wrapper_end = self.wrapper_end.replace("{block_name}", self.tag),
         )
 
 
@@ -134,13 +125,6 @@ class JinjaExtends(Tag):
                 **kwargs
         )
 
-    def __str__(self):
-        return self.html.format(
-                wrapper_start = self.wrapper_start.replace("{block_name}", self.tag),
-                content = self.content + _assign_children(self.children),
-                wrapper_end = self.wrapper_end.replace("{block_name}", self.tag),
-        )
-
 
 class JinjaComment(Tag):
     def __init__(self, tag, **kwargs):
@@ -150,13 +134,6 @@ class JinjaComment(Tag):
                 tag = tag,
                 uses_end_tag = False,
                 **kwargs
-        )
-
-    def __str__(self):
-        return self.html.format(
-                wrapper_start = self.wrapper_start.replace("{block_name}", self.tag),
-                content = self.content + _assign_children(self.children),
-                wrapper_end = self.wrapper_end.replace("{block_name}", self.tag),
         )
 
 
@@ -170,13 +147,6 @@ class JinjaExpression(Tag):
                 **kwargs
         )
 
-    def __str__(self):
-        return self.html.format(
-                wrapper_start = self.wrapper_start.replace("{block_name}", self.tag),
-                content = self.content + _assign_children(self.children),
-                wrapper_end = self.wrapper_end.replace("{block_name}", self.tag),
-        )
-
 
 class JinjaStatement(Tag):
     def __init__(self, tag, **kwargs):
@@ -186,13 +156,6 @@ class JinjaStatement(Tag):
                 tag = tag,
                 uses_end_tag = False,
                 **kwargs
-        )
-
-    def __str__(self):
-        return self.html.format(
-                wrapper_start = self.wrapper_start.replace("{block_name}", self.tag),
-                content = self.content + _assign_children(self.children),
-                wrapper_end = self.wrapper_end.replace("{block_name}", self.tag),
         )
 
 
