@@ -3,7 +3,7 @@ from functools import wraps
 from base import Builder, Node, NodeDescriptor
 
 
-def _mixin_find_parent(value: "Builder"):
+def find_parent(value: "Builder"):
     if hasattr(value, "parent"):
         while value.parent is not None:
             value = value.parent
@@ -11,7 +11,7 @@ def _mixin_find_parent(value: "Builder"):
     return None
 
 
-def _mixin_link_parents_deco(cls__init__):
+def link_parents_deco(cls__init__):
     # makes the annotations work, and adds the children to the tree, used by the mixin
     @wraps(cls__init__)
     def wrapper(self, *args, **kwargs):
@@ -23,7 +23,7 @@ def _mixin_link_parents_deco(cls__init__):
     return wrapper
 
 
-def _mixin_init(self, **kwargs):
+def cls_init(self, **kwargs):
     # Dynamically created __init__ function to be applied to the class, created by the mixin.
     # Allows simple adding of children through naming convention.
     # You can add a child by prepending the name with the name of the parent with an underscore
@@ -58,7 +58,7 @@ def _mixin_init(self, **kwargs):
                 raise AttributeError(f"Unknown attribute {name}")
 
 
-def _mixin_str(self):
+def cls_str(self):
     # dynamic str that searches for the root node, and then returns its str, created by the mixin
     # assumes that the class is properly annotated, hopes for a node called 'root,
     # falls back searches the instance, then the class for the first node, and then goes up the tree
@@ -71,13 +71,13 @@ def _mixin_str(self):
     if not root:
         for name, value in self.__dict__.items():
             if hasattr(value, "parent"):
-                root = _mixin_find_parent(value)
+                root = find_parent(value)
                 break
 
     if not root:
         for name, value in self.__class__.__dict__.items():
             if isinstance(value, NodeDescriptor):
-                root = _mixin_find_parent(value.__get__(self, self.__class__))
+                root = find_parent(value.__get__(self, self.__class__))
                 break
 
     if not root:
@@ -86,14 +86,8 @@ def _mixin_str(self):
     return str(root)
 
 
-class NodeMixin:
-    def __init_subclass__(
-            cls,
-            init = True,
-            string = True,
-            **kwargs
-    ):
-        super().__init_subclass__(**kwargs)
-        cls.__init__ = _mixin_link_parents_deco(cls.__init__ if not init else _mixin_init)
-        if string:  cls.__str__ = _mixin_str
-
+def document(cls, /, init = True, link_annotations = True, string = True, **kwargs):
+    if init: cls.__init__ = cls_init
+    if link_annotations: cls.__init__ = link_parents_deco(cls.__init__)
+    if string:  cls.__str__ = cls_str
+    return cls

@@ -1,5 +1,5 @@
 from base import Builder, Node, NodeDescriptor
-from mixin import NodeMixin
+from mixin import document
 
 
 class _HTMLNode(Node):
@@ -131,14 +131,7 @@ class _JinjaNode(Node):
         return f"{leading}{content}{trailing if self.use_trailing_tag else ''}"
 
 
-def document(cls = None, /, **kwargs):
-    if cls is None:
-        return lambda _cls: document(_cls, **kwargs)
-    return type(cls.__name__, (cls, NodeMixin), {
-            "__init_subclass__":
-                lambda _cls, **_kwargs:
-                super().__init_subclass__(**_kwargs, **kwargs),  # noqa
-    })
+
 
 
 def node(tag_name, *args, is_class_node = False, **kwargs):
