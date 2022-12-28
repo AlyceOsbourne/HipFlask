@@ -1,9 +1,11 @@
 from functools import wraps
 
-from base import Builder, Node, NodeDescriptor
+from bs4 import BeautifulSoup
+
+from base import NodeBuilder, Node, NodeDescriptor
 
 
-def find_parent(value: "Builder"):
+def find_parent(value: "NodeBuilder"):
     if hasattr(value, "parent"):
         while value.parent is not None:
             value = value.parent
@@ -11,7 +13,7 @@ def find_parent(value: "Builder"):
     return None
 
 
-def link_parents_deco(cls__init__):
+def link_document_nodes(cls__init__):
     # makes the annotations work, and adds the children to the tree, used by the mixin
     @wraps(cls__init__)
     def wrapper(self, *args, **kwargs):
@@ -23,7 +25,7 @@ def link_parents_deco(cls__init__):
     return wrapper
 
 
-def cls_init(self, **kwargs):
+def document_init(self, **kwargs):
     # Dynamically created __init__ function to be applied to the class, created by the mixin.
     # Allows simple adding of children through naming convention.
     # You can add a child by prepending the name with the name of the parent with an underscore
@@ -41,7 +43,7 @@ def cls_init(self, **kwargs):
     # when making more complex pages, use the node descriptor and the init to add children
     for name, value in kwargs.items():
         if isinstance(value, Node):
-            value = Builder(value)
+            value = NodeBuilder(value)
         if hasattr(self, name):
             setattr(self, name, value)
         else:
@@ -58,7 +60,7 @@ def cls_init(self, **kwargs):
                 raise AttributeError(f"Unknown attribute {name}")
 
 
-def cls_str(self):
+def document_string(self):
     # dynamic str that searches for the root node, and then returns its str, created by the mixin
     # assumes that the class is properly annotated, hopes for a node called 'root,
     # falls back searches the instance, then the class for the first node, and then goes up the tree
@@ -82,12 +84,6 @@ def cls_str(self):
 
     if not root:
         raise ValueError("Root node not found")
-    # return BeautifulSoup(str(root), "html.parser").prettify()
-    return str(root)
 
+    return BeautifulSoup(str(root), "html.parser").prettify()
 
-def document(cls, /, init = True, link_annotations = True, string = True, **kwargs):
-    if init: cls.__init__ = cls_init
-    if link_annotations: cls.__init__ = link_parents_deco(cls.__init__)
-    if string:  cls.__str__ = cls_str
-    return cls
