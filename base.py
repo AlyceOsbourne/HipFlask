@@ -3,12 +3,19 @@ from functools import wraps
 from typing import NamedTuple
 
 from bs4 import BeautifulSoup
+from flask import Blueprint
+
+blueprint = Blueprint("blueprint", __name__)
 
 
-def document(cls):
-    # quick decorator to add the mixin to the class,
-    # this is cause folks feel nervous about meta magic, but will happily decorate the crap outta things
-    return type(cls.__name__, (cls, NodeMixin), {})
+def document(cls = None, /, **kwargs):
+    if cls is None:
+        return lambda _cls: document(_cls, **kwargs)
+    return type(cls.__name__, (cls, NodeMixin), {
+            "__init_subclass__":
+                lambda _cls, **_kwargs:
+                super().__init_subclass__(**_kwargs, **kwargs),  # noqa
+    })
 
 
 def node(tag_name, *args, is_class_node = False, **kwargs):
@@ -16,13 +23,13 @@ def node(tag_name, *args, is_class_node = False, **kwargs):
     # Searches for name or tag, so Html and html are aliases for the same thing
     if is_class_node:
         return NodeDescriptor(tag_name, *args, **kwargs)
-    for member in [member for subclass in Node.__subclasses__() for member in subclass]:
+    for member in (member for subclass in Node.__subclasses__() for member in subclass):
         if member.name == tag_name or member.tag == tag_name:
             return Builder(member, *args, **kwargs)
     raise ValueError(f"Node {tag_name} not found")
 
 
-def _mixin_find_parent(value):
+def _mixin_find_parent(value: "Builder"):
     if hasattr(value, "parent"):
         while value.parent is not None:
             value = value.parent
@@ -30,21 +37,37 @@ def _mixin_find_parent(value):
     return None
 
 
-def _mixin_link_parents_deco(init):
+def _mixin_link_parents_deco(cls__init__):
     # makes the annotations work, and adds the children to the tree, used by the mixin
-    @wraps(init)
+    @wraps(cls__init__)
     def wrapper(self, *args, **kwargs):
         for name, value in self.__annotations__.items():
             if isinstance(value, str) and hasattr(self, value):
                 getattr(self, value).add_child(getattr(self, name))
-        init(self, *args, **kwargs)
+        cls__init__(self, *args, **kwargs)
 
     return wrapper
 
 
 def _mixin_init(self, **kwargs):
-    # dynamic init, so you can pass in the children as kwargs, created by the mixin
+    # Dynamically created __init__ function to be applied to the class, created by the mixin.
+    # Allows simple adding of children through naming convention.
+    # You can add a child by prepending the name with the name of the parent with an underscore
+    # example:
+    # class HTML:
+    #     root = node("DocType", is_class_node = True)
+    #
+    # page = HTML(
+    #   root_head = node("head"),
+    #   head_title = node("title"),
+    #   head_meta = node("meta", charset = "utf-8"),
+    # )
+    #
+    # this is for lazy throwing together of simple pages, and is not recommended for complex pages
+    # when making more complex pages, use the node descriptor and the init to add children
     for name, value in kwargs.items():
+        if isinstance(value, Node):
+            value = Builder(value)
         if hasattr(self, name):
             setattr(self, name, value)
         else:
@@ -55,7 +78,7 @@ def _mixin_init(self, **kwargs):
                         getattr(self, _name).add_children(*value)
                     else:
                         getattr(self, _name).add_child(value)
-                    setattr(self, name, value)
+                    setattr(self, name[len(_name) + 1:], value)
                     break
             else:
                 raise AttributeError(f"Unknown attribute {name}")
@@ -85,20 +108,20 @@ def _mixin_str(self):
 
     if not root:
         raise ValueError("Root node not found")
-    return BeautifulSoup(str(root), "html.parser").prettify()
+    # return BeautifulSoup(str(root), "html.parser").prettify()
+    return str(root)
 
 
 class Builder:
-    # builder monad that represents the nodes tree, adds children, and handles formatting
     def __init__(
             self,
-            root,
+            node_type,
             *args,
             children = None,
             parent = None,
             **kwargs,
     ):
-        self.node = root
+        self.node = node_type
         self.args = args or tuple()
         self.kwargs = kwargs or dict()
         self.children = children or list()
@@ -110,16 +133,17 @@ class Builder:
                 _node = node(_node, *args, parent = self, **kwargs)
             except ValueError:
                 pass
-        if isinstance(_node, (Builder)):
+        if isinstance(_node, Builder):
             _node.__dict__.update(parent = self)
         if _node is not None:
             self.children.append(_node)
-        return _node
+        return self
 
     def add_sibling(self, _node, *args, **kwargs):
         if self.parent is None:
             raise ValueError("No parent node")
-        return self.parent.add_child(_node, *args, **kwargs)
+        self.parent.add_child(_node, *args, **kwargs)
+        return self
 
     @staticmethod
     def _add_children(parent, *nodes):
@@ -128,25 +152,31 @@ class Builder:
 
     def add_children(self, *nodes):
         self._add_children(self, *nodes)
+        return self
 
     def add_siblings(self, *nodes):
         if self.parent is None:
             raise ValueError("No parent node")
         self._add_children(self.parent, *nodes)
+        return self
 
     def add_attr(self, name, value = None):
         if value is None:
             self.args = self.args + (name,)
         else:
             self.kwargs[name] = value
+        return self
 
     def add_attrs(self, *args, **kwargs):
         self.args = self.args + args
         self.kwargs.update(kwargs)
+        return self
 
     def __str__(self):
         return self.node.format(
-                self.args, "".join(map(str, self.children)), self.kwargs
+                args = self.args,
+                kwargs = self.kwargs,
+                content = "".join(map(str, self.children))
         )
 
     def __repr__(self):
@@ -171,37 +201,47 @@ class Node(
 
 
 class NodeMixin:
-    # Most of the class based magic is here. this does several things:
-    # searches annotations for the name of parents, still needs testing
-    # create a str method that returns the formatted string
-    # creates an __init__ method that takes the same args as the node, and applies as children utilizing
-    # the descriptors
-    def __init_subclass__(cls, init = True, string = True, **kwargs):
+    def __init_subclass__(
+            cls,
+            init = True,
+            string = True,
+            **kwargs
+    ):
         super().__init_subclass__(**kwargs)
         cls.__init__ = _mixin_link_parents_deco(cls.__init__ if not init else _mixin_init)
         if string:  cls.__str__ = _mixin_str
 
 
 class NodeDescriptor:
-    # descriptor that allows for class based pages
+    def __set_name__(self, owner, name):
+        self.name = name
+
     def __init__(self, tag_name, *args, **kwargs):
-        self.name = tag_name
+        self.tag_name = tag_name
         self.args = args
         self.kwargs = kwargs
 
     def __get__(self, instance, owner):
-        # creates a builder for the node on the instance
         if instance is None:
-            return owner
+            return self
         return instance.__dict__.setdefault(
-                self.name, node(self.name, *self.args, **self.kwargs)
+                self.name,
+                node(
+                        self.tag_name,
+                        *self.args,
+                        **self.kwargs
+                )
         )
 
     def __set__(self, instance, value):
         if instance is None:
             raise AttributeError("Cannot set class attribute")
         parent = instance.__dict__.setdefault(
-                self.name, node(self.name, *self.args, **self.kwargs)
+                self.name,
+                node(
+                        self.tag_name,
+                        *self.args,
+                        **self.kwargs)
         )
         if isinstance(value, (tuple, list)):
             parent.add_children(*value)
@@ -210,6 +250,19 @@ class NodeDescriptor:
 
     def __delete__(self, instance):
         raise AttributeError("Cannot delete attribute")
+
+
+    def add_attr(self, name, value = None):
+        if value is None:
+            self.args = self.args + (name,)
+        else:
+            self.kwargs[name] = value
+        return self
+
+    def add_attrs(self, *args, **kwargs):
+        self.args = self.args + args
+        self.kwargs.update(kwargs)
+        return self
 
 
 class _HTMLNode(Node):
@@ -318,27 +371,24 @@ class _HTMLNode(Node):
 
 
 class _JinjaNode(Node):
+    Includes = "include", "include '{attributes}'", "", False
+    Extends = "extends", "extends '{attributes}'", "", False
+    Block = "block", "block {attributes}", "endblock {attributes}", True
 
-    def format(self, *args, content, **kwargs):
-        attributes = ""
-        attributes += " ".join(args)
-        attributes += " ".join(f"{key}={value}" for key, value in kwargs.items())
-        leading = self.leading.replace("{attributes}", attributes)
-        trailing = (
-                self.trailing.replace("{attributes}", attributes)
-                if self.use_trailing_tag
-                else ""
+    def format(self, args, content, kwargs):
+        start_tag = "{% "
+        end_tag = " %}"
+
+        attributes = (
+                " ".join(args)
+                + " ".join(f"{k}={v}" for k, v in kwargs.items())
         )
-        return f"{leading}{content}{trailing}"
 
-    Block = "block", "{% block {attributes} %}", "{% endblock {attributes} %}", True
-    Include = "include", "{% include {attributes} %}", "", False
-    Extends = "extends", "{% extends {attributes} %}", "", False
-    For = "for", "{% for {attributes} %}", "{% endfor %}", True
-    If = "if", "{% if {attributes} %}", "{% endif %}", True
-    Elif = "elif", "{% elif {attributes} %}", "", False
-    Else = "else", "{% else %}", "", False
-    Set = "set", "{% set {attributes} %}", "", False
-    With = "with", "{% with {attributes} %}", "{% endwith %}", True
-    Macro = "macro", "{% macro {attributes} %}", "{% endmacro %}", True
-    Call = "call", "{% call {attributes} %}", "{% endcall %}", True
+        leading = self.leading.format(attributes = attributes)
+        try:
+            trailing = self.trailing.format(attributes = attributes)
+        except KeyError:
+            trailing = self.trailing
+        leading = start_tag + leading + end_tag
+        trailing = start_tag + trailing + end_tag
+        return f"{leading}{content}{trailing if self.use_trailing_tag else ''}"
