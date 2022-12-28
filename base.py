@@ -1,6 +1,9 @@
+from collections import UserString
 from enum import Enum
 from functools import wraps
 from typing import NamedTuple
+
+from bs4 import BeautifulSoup
 
 
 class Builder:
@@ -43,7 +46,7 @@ class Builder:
 
     def __str__(self):
         return self.node.format(
-                *self.args, content = "".join(map(str, self.children)), **self.kwargs
+                self.args, "".join(map(str, self.children)), self.kwargs
         )
 
     def __repr__(self):
@@ -60,39 +63,57 @@ class Node(NamedTuple(
         ],
 ), Enum):
 
-    def format(self, *args, **kwargs):
+    def format(self, args, content, kwargs):
         raise NotImplementedError
 
 
 class NodeMixin:
-    def __init_subclass__(cls, **kwargs):
+    def __init_subclass__(cls, init = True, string = True, **kwargs):
         super().__init_subclass__(**kwargs)
 
         def __str__(self):
             for key, value in self.__dict__.items():
-                if isinstance(value, Builder):
-                    if hasattr(value, "parent"):
-                        if value.parent is None:
-                            return str(value)
+                if hasattr(value, "parent"):
+                    if value.parent is None:
+                        return BeautifulSoup(str(value), "html.parser").prettify()
             else:
                 return "No Root Node"
 
-        def __init__(init):
+        def wrap_init(init):
             @wraps(init)
             def wrapper(self, *args, **kwargs):
                 for name, value in self.__annotations__.items():
                     if isinstance(value, str) and hasattr(self, value):
                         getattr(self, value).add_child(getattr(self, name))
                 init(self, *args, **kwargs)
+
             return wrapper
 
-        cls.__init__ = __init__(cls.__init__)
-        cls.__str__ = __str__
+        def __init__(self, **kwargs):
+            for name, value in kwargs.items():
+                if hasattr(self, name):
+                    setattr(self, name, value)
+                else:
+                    while (_name := name).count("_") > 0:
+                        _name = _name[:_name.rfind("_")]
+                        if hasattr(self, _name):
+                            if isinstance(value, (tuple, list)):
+                                getattr(self, _name).add_children(*value)
+                            else:
+                                getattr(self, _name).add_child(value)
+                            setattr(self, name, value)
+                            break
+                    else:
+                        raise AttributeError(f"Unknown attribute {name}")
+
+        cls.__init__ = wrap_init(cls.__init__ if not init else __init__)
+        if string:
+            cls.__str__ = __str__
 
 
 class NodeDescriptor:
-    def __init__(self, name, *args, **kwargs):
-        self.name = name
+    def __init__(self, tag_name, *args, **kwargs):
+        self.name = tag_name
         self.args = args
         self.kwargs = kwargs
 
@@ -201,7 +222,7 @@ class _HTMLNode(Node):
     NoScript = create_html_node("noscript")
     Script = create_html_node("script")
 
-    def format(self, *args, content, **kwargs):
+    def format(self, args, content, kwargs):
         attributes = (" " if args or kwargs else "") + " ".join(args) + " ".join(f"{k}={v}" for k, v in kwargs.items())
 
         try:
@@ -244,12 +265,10 @@ def document(cls):
     return type(cls.__name__, (cls, NodeMixin), {})
 
 
-def node(name, *args, **kwargs):
+def node(tag_name, *args, is_class_node = False, **kwargs):
+    if is_class_node:
+        return NodeDescriptor(tag_name, *args, **kwargs)
     for member in [member for subclass in Node.__subclasses__() for member in subclass]:
-        if member.name == name or member.tag == name:
+        if member.name == tag_name or member.tag == tag_name:
             return Builder(member, *args, **kwargs)
-    raise ValueError(f"Node {name} not found")
-
-
-def class_node(name, *args, **kwargs):
-    return NodeDescriptor(name, *args, **kwargs)
+    raise ValueError(f"Node {tag_name} not found")

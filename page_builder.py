@@ -1,13 +1,18 @@
-from base import document, node, class_node
+from collections import UserString
+
+from bs4 import BeautifulSoup
+
+from base import document, node
+
 
 @document
 class HTML:
-    root = class_node("html")
-    head: "root" = class_node("head")
-    body: "root" = class_node("body")
-    title: "head" = class_node("title")
+    root = node("DocType", is_class_node = True)
+    html: "root" = node("html", is_class_node = True)
+    head: "html" = node("head", is_class_node = True)
+    body: "html" = node("body", is_class_node = True)
+    title: "head" = node("title", is_class_node = True)
 
 
 html = HTML()
-html.title = "Hello World"
 print(html)
