@@ -2,7 +2,9 @@ from functools import wraps
 
 from bs4 import BeautifulSoup
 
-from base import NodeBuilder, Node, NodeDescriptor
+from .builder import NodeBuilder
+from .descriptor import NodeDescriptor
+from .nodes import Node
 
 
 def find_parent(value: "NodeBuilder"):
@@ -13,16 +15,26 @@ def find_parent(value: "NodeBuilder"):
     return None
 
 
-def link_document_nodes(cls__init__):
-    # makes the annotations work, and adds the children to the tree, used by the mixin
+def wrap_init(cls__init__):
     @wraps(cls__init__)
     def wrapper(self, *args, **kwargs):
         for name, value in self.__annotations__.items():
-            if isinstance(value, str) and hasattr(self, value):
-                getattr(self, value).add_child(getattr(self, name))
+            if isinstance(value, str) and hasattr(self, value) and hasattr((candidate:=getattr(self, value)), "parent"):
+                candidate.add_child(getattr(self, name))
         cls__init__(self, *args, **kwargs)
 
     return wrapper
+
+
+def attempt_attach(kwargs, **children):
+    for key, value in children.items():
+        try:
+            kwargs[key] = [*value, *kwargs[key]]
+        except TypeError:
+            kwargs[key] = [*value, kwargs[key]]
+        except KeyError:
+            kwargs['head'] = [*value]
+    return kwargs
 
 
 def document_init(self, **kwargs):
@@ -45,7 +57,11 @@ def document_init(self, **kwargs):
         if isinstance(value, Node):
             value = NodeBuilder(value)
         if hasattr(self, name):
-            setattr(self, name, value)
+            if isinstance(value, (NodeBuilder, str)):
+                getattr(self, name).add_child(value)
+            elif isinstance(value, list):
+                for item in value:
+                    getattr(self, name).add_child(item)
         else:
             while (_name := name).count("_") > 0:
                 _name = _name[: _name.rfind("_")]
@@ -86,4 +102,3 @@ def document_string(self):
         raise ValueError("Root node not found")
 
     return BeautifulSoup(str(root), "html.parser").prettify()
-

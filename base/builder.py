@@ -1,4 +1,4 @@
-from base import Node
+from .nodes import Node
 
 
 class NodeBuilder:
@@ -11,6 +11,8 @@ class NodeBuilder:
             **kwargs,
     ):
         self.node = node_type if isinstance(node_type, Node) else Node.get(node_type)
+        if self.node is None:
+            raise ValueError(f"Unknown node type: {node_type}")
         self.args = args or tuple()
         self.kwargs = kwargs or dict()
         self.children = children or list()
@@ -71,3 +73,17 @@ class NodeBuilder:
     def __repr__(self):
         return f"NodeBuilder({self.node}, args = {self.args}, kwargs = {self.kwargs}, children = {self.children})"
 
+    def __or__(self, other):
+        if isinstance(other, (tuple, list)):
+            return self.add_siblings(*other)
+        return self.add_sibling(other)
+
+    def __add__(self, other):
+        if isinstance(other, (tuple, list)):
+            return self.add_children(*other)
+        return self.add_child(other)
+
+    def __rshift__(self, other):
+        if isinstance(other, dict):
+            return self.add_attrs(**other)
+        return self.add_attrs(*other)

@@ -1,4 +1,5 @@
-from base import Node, NodeBuilder
+from .nodes import Node
+from .builder import NodeBuilder
 
 
 class NodeDescriptor:
