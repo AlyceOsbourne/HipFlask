@@ -51,3 +51,12 @@ class Node:
 
     def __repr__(self):
         return f"Node({self.node}, args = {self.args}, kwargs = {self.kwargs}, children = {self.children})"
+
+    def traverse(self, include_self = True):
+        if include_self:
+            yield self
+        for child in self.children:
+            if hasattr(child, "traverse"):
+                yield from child.traverse()
+
+

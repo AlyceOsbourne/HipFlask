@@ -2,7 +2,7 @@ from .nodes import BaseNode
 from .builder import Node
 
 
-class NodeDescriptor:
+class ClassNode:
     def __set_name__(self, owner, name):
         self.name = name
 
