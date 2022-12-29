@@ -1,3 +1,5 @@
+from collections.abc import Generator
+
 from .nodes import BaseNode
 from .builder import Node
 
@@ -39,8 +41,9 @@ class ClassNode:
                         *self.args,
                         **self.kwargs)
         )
-        if isinstance(value, (tuple, list)):
-            parent.extend(*value)
+        if isinstance(value, (tuple, list, Generator)):
+            for item in value:
+                self.__set__(instance, item)
         else:
             parent.append(value)
 

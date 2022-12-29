@@ -8,21 +8,21 @@ class Node:
             *args,
             children = None,
             parent = None,
-            _class = None,
-            _id = None,
+            class_ = None,
+            id_ = None,
             **kwargs,
     ):
         self.node = tag_name if isinstance(tag_name, BaseNode) else BaseNode.get(tag_name)
         self.args = list(args) if args else []
         self.kwargs = kwargs or dict()
-        if _class is not None:
-            self.kwargs["class"] = _class
-        if _id is not None:
-            self.kwargs["id"] = _id
+        if class_ is not None:
+            self.kwargs["class"] = class_
+        if id_ is not None:
+            self.kwargs["id"] = id_
         self.children = children or list()
         self.parent = parent
 
-    def append(self, _node, *args, **kwargs):
+    def _append(self, _node, *args, **kwargs):
         if isinstance(_node, str):
             try:
                 _node = Node(BaseNode.get(_node), *args, **kwargs)
@@ -31,7 +31,14 @@ class Node:
         if isinstance(_node, Node):
             _node.__dict__.update(parent = self)
         self.children.append(_node)
+        return _node
+
+    def append(self, _node, *args, **kwargs):
+        self._append(_node, *args, **kwargs)
         return self
+
+    def add(self, _node, *args, **kwargs):
+        return self._append(_node, *args, **kwargs)
 
     def extend(self, *nodes):
         for node in nodes:
