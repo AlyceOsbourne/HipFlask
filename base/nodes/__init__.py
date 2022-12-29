@@ -1,7 +1,7 @@
-from .base_node import Node
+from .base_node import BaseNode
 
 
-class _HTMLNode(Node):
+class _HTMLNode(BaseNode):
     @staticmethod
     def create_html_node(tag: str, use_end_tag: bool = True):
         # cause who wants to rewrite these every time
@@ -106,7 +106,7 @@ class _HTMLNode(Node):
     Script = create_html_node("script")
 
 
-class _JinjaNode(Node):
+class _JinjaNode(BaseNode):
 
     def format(self, args, content, kwargs):
         start_tag = "{% "

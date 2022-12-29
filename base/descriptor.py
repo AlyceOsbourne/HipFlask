@@ -1,5 +1,5 @@
-from .nodes import Node
-from .builder import NodeBuilder
+from .nodes import BaseNode
+from .builder import Node
 
 
 class NodeDescriptor:
@@ -8,16 +8,17 @@ class NodeDescriptor:
 
     def __init__(self, tag_name, *args, **kwargs):
         self.tag_name = tag_name
-        self.args = args
+        self.args = list(args)
         self.kwargs = kwargs
 
     def __get__(self, instance, owner):
         if instance is None:
             return self
+
         return instance.__dict__.setdefault(
                 self.name,
-                NodeBuilder(
-                        Node.get(self.tag_name),
+                Node(
+                        BaseNode.get(self.tag_name),
                         *self.args,
                         **self.kwargs
                 )
@@ -25,30 +26,28 @@ class NodeDescriptor:
 
     def __set__(self, instance, value):
         if instance is None:
-            raise AttributeError("Cannot set class attribute")
+            if isinstance(value, BaseNode):
+                self.tag_name = value.tag
+            elif isinstance(value, str):
+                self.tag_name = value
+            else:
+                raise ValueError("Invalid value")
         parent = instance.__dict__.setdefault(
                 self.name,
-                NodeBuilder(
-                        Node.get(self.tag_name),
+                Node(
+                        BaseNode.get(self.tag_name),
                         *self.args,
                         **self.kwargs)
         )
         if isinstance(value, (tuple, list)):
-            parent.add_children(*value)
+            parent.extend(*value)
         else:
-            parent.add_child(value)
+            parent.append(value)
 
     def __delete__(self, instance):
         raise AttributeError("Cannot delete attribute")
 
-    def add_attr(self, name, value = None):
-        if value is None:
-            self.args = self.args + (name,)
-        else:
-            self.kwargs[name] = value
-        return self
-
     def add_attrs(self, *args, **kwargs):
-        self.args = self.args + args
+        self.args.extend(args)
         self.kwargs.update(kwargs)
         return self

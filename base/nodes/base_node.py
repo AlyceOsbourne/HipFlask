@@ -2,7 +2,7 @@ from enum import Enum
 from typing import NamedTuple
 
 
-class Node(
+class BaseNode(
         NamedTuple(
                 "BaseNode",
                 [
@@ -20,6 +20,7 @@ class Node(
 
     @staticmethod
     def get(tag_name):
-        for member in (member for subclass in Node.__subclasses__() for member in subclass):
+        for member in (member for subclass in BaseNode.__subclasses__() for member in subclass):
             if member.name == tag_name or member.tag == tag_name:
                 return member
+        raise ValueError(f"Invalid tag name: {tag_name}")

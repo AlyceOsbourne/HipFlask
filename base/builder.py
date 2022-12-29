@@ -1,65 +1,44 @@
-from .nodes import Node
+from .nodes import BaseNode
 
 
-class NodeBuilder:
+class Node:
     def __init__(
             self,
-            node_type,
+            tag_name,
             *args,
             children = None,
             parent = None,
+            _class = None,
+            _id = None,
             **kwargs,
     ):
-        self.node = node_type if isinstance(node_type, Node) else Node.get(node_type)
-        if self.node is None:
-            raise ValueError(f"Unknown node type: {node_type}")
-        self.args = args or tuple()
+        self.node = tag_name if isinstance(tag_name, BaseNode) else BaseNode.get(tag_name)
+        self.args = list(args) if args else []
         self.kwargs = kwargs or dict()
+        if _class is not None:
+            self.kwargs["class"] = _class
+        if _id is not None:
+            self.kwargs["id"] = _id
         self.children = children or list()
         self.parent = parent
 
-    def add_child(self, _node, *args, **kwargs):
+    def append(self, _node, *args, **kwargs):
         if isinstance(_node, str):
             try:
-                _node = NodeBuilder(Node.get(_node), *args, **kwargs)
+                _node = Node(BaseNode.get(_node), *args, **kwargs)
             except ValueError:
                 pass
-        if isinstance(_node, NodeBuilder):
+        if isinstance(_node, Node):
             _node.__dict__.update(parent = self)
-        if _node is not None:
-            self.children.append(_node)
+        self.children.append(_node)
         return self
 
-    def add_sibling(self, _node, *args, **kwargs):
-        if self.parent is None:
-            raise ValueError("No parent node")
-        self.parent.add_child(_node, *args, **kwargs)
-        return self
-
-    @staticmethod
-    def _add_children(parent, *nodes):
+    def extend(self, *nodes):
         for node in nodes:
-            parent.add_child(node)
-
-    def add_children(self, *nodes):
-        self._add_children(self, *nodes)
-        return self
-
-    def add_siblings(self, *nodes):
-        if self.parent is None:
-            raise ValueError("No parent node")
-        self._add_children(self.parent, *nodes)
-        return self
-
-    def add_attr(self, name, value = None):
-        if value is None:
-            self.args = self.args + (name,)
-        else:
-            self.kwargs[name] = value
-        return self
+            self.append(node)
 
     def add_attrs(self, *args, **kwargs):
-        self.args = self.args + args
+        self.args.extend(args)
         self.kwargs.update(kwargs)
         return self
 
@@ -71,19 +50,4 @@ class NodeBuilder:
         )
 
     def __repr__(self):
-        return f"NodeBuilder({self.node}, args = {self.args}, kwargs = {self.kwargs}, children = {self.children})"
-
-    def __or__(self, other):
-        if isinstance(other, (tuple, list)):
-            return self.add_siblings(*other)
-        return self.add_sibling(other)
-
-    def __add__(self, other):
-        if isinstance(other, (tuple, list)):
-            return self.add_children(*other)
-        return self.add_child(other)
-
-    def __rshift__(self, other):
-        if isinstance(other, dict):
-            return self.add_attrs(**other)
-        return self.add_attrs(*other)
+        return f"Node({self.node}, args = {self.args}, kwargs = {self.kwargs}, children = {self.children})"
