@@ -7,7 +7,7 @@ def init_env(env):
     env.globals.update(_get_widgets())
 
 
-def init_app(self, app):
+def init_app(app):
     # add to flask
     init_env(app.jinja_env)
 
