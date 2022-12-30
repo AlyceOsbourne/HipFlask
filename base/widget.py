@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from collections import UserDict
 from types import MappingProxyType
 
 from bs4 import BeautifulSoup
@@ -40,3 +39,11 @@ class Widget(ABC):
                     self.__class__.__name__,
                     str(self),
             )
+
+    def add_attribute_to(self, name, **attributes):
+        if hasattr(self, name):
+            attr = getattr(self, name)
+            if hasattr(attr, 'add_attrs'):
+                attr.add_attrs(**attributes)
+                return
+        raise AttributeError(f"Cannot add attributes to {name}")

@@ -53,7 +53,7 @@ class Node:
         return self.node.format(
                 args = self.args,
                 kwargs = self.kwargs,
-                content = "".join(map(str, self.children))
+                content = "".join(map(str, (child for child in self.children if child is not None))),
         )
 
     def __repr__(self):

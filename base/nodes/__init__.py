@@ -1,6 +1,42 @@
 from .base_node import BaseNode
 
 
+class JinjaNode(BaseNode):
+
+    def format(self, args, content, kwargs):
+        start_tag = "{% "
+        end_tag = " %}"
+
+        attributes = (
+                " ".join(args)
+                + " ".join(f"{k}={v}" for k, v in kwargs.items())
+        )
+
+        leading = self.leading.format(attributes = attributes)
+        try:
+            trailing = self.trailing.format(attributes = attributes)
+        except KeyError:
+            trailing = self.trailing
+        leading = start_tag + leading + end_tag
+        trailing = start_tag + trailing + end_tag
+        return f"{leading}{content}{trailing if self.use_trailing_tag else ''}"
+
+    Includes = "include", "include '{attributes}'", "", False
+    Extends = "extends", "extends '{attributes}'", "", False
+    Block = "block", "block {attributes}", "endblock {attributes}", True
+    For = "for", "for {attributes}", "endfor", True
+    If = "if", "if {attributes}", "endif", True
+    Elif = "elif", "elif {attributes}", "", False
+    Else = "else", "else", "", False
+    Set = "set", "set {attributes}", "", False
+    With = "with", "with {attributes}", "endwith", True
+    AutoEscape = "autoescape", "autoescape {attributes}", "endautoescape", True
+    Call = "call", "call {attributes}", "endcall", True
+    Filter = "filter", "filter {attributes}", "endfilter", True
+    Macro = "macro", "macro {attributes}", "endmacro", True
+    Raw = "raw", "raw", "endraw", True
+
+
 class HTMLNode(BaseNode):
     @staticmethod
     def create_html_node(tag: str, use_end_tag: bool = True):
@@ -104,28 +140,3 @@ class HTMLNode(BaseNode):
     IFrame = create_html_node("iframe")
     NoScript = create_html_node("noscript")
     Script = create_html_node("script")
-
-
-class JinjaNode(BaseNode):
-
-    def format(self, args, content, kwargs):
-        start_tag = "{% "
-        end_tag = " %}"
-
-        attributes = (
-                " ".join(args)
-                + " ".join(f"{k}={v}" for k, v in kwargs.items())
-        )
-
-        leading = self.leading.format(attributes = attributes)
-        try:
-            trailing = self.trailing.format(attributes = attributes)
-        except KeyError:
-            trailing = self.trailing
-        leading = start_tag + leading + end_tag
-        trailing = start_tag + trailing + end_tag
-        return f"{leading}{content}{trailing if self.use_trailing_tag else ''}"
-
-    Includes = "include", "include '{attributes}'", "", False
-    Extends = "extends", "extends '{attributes}'", "", False
-    Block = "block", "block {attributes}", "endblock {attributes}", True
